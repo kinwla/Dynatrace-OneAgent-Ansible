@@ -1,5 +1,6 @@
 import logging
 import re
+from pathlib import Path
 
 import pytest
 from ansible.config import AnsibleConfigurator
@@ -9,6 +10,7 @@ from constants import (
     FAILED_DEPLOYMENT_EXIT_CODE,
     TEST_SIGNATURE_FILE,
     VARIABLE_PREFIX,
+    WORK_DIR_PATH,
 )
 from deployment.deployment_operations import (
     enable_for_system_family,
@@ -198,4 +200,22 @@ def test_failed_signature_verification(
 
     _check_deployment_failure(
         run_deployment(runner, configurator, True), _error_messages[SIGNATURE_VERIFICATION_FAILED_KEY], FAILED_DEPLOYMENT_EXIT_CODE
+    )
+
+
+@enable_for_system_family(family="windows")
+def test_failed_signature_verification_windows(
+    _error_messages: dict[str, str],
+    runner: AnsibleRunner,
+    configurator: AnsibleConfigurator,
+    platforms: PlatformCollection,  # pylint: disable=unused-argument  # required by enable_for_system_family
+):
+    unsigned_installer: Path = WORK_DIR_PATH / "Dynatrace-OneAgent-Windows-unsigned.exe"
+    _unused = unsigned_installer.write_bytes(b"MZ unsigned installer that must never be executed")
+    configurator.set_common_parameter(configurator.LOCAL_INSTALLER_KEY, str(unsigned_installer))
+
+    _check_deployment_failure(
+        run_deployment(runner, configurator, True),
+        _error_messages[SIGNATURE_VERIFICATION_FAILED_KEY],
+        FAILED_DEPLOYMENT_EXIT_CODE,
     )

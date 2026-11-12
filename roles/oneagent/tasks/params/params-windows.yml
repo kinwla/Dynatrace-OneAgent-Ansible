@@ -1,4 +1,21 @@
 ---
+- name: Determine whether the role runs with administrator privileges
+  ansible.windows.win_powershell:
+    script: |
+      $principal = New-Object -TypeName System.Security.Principal.WindowsPrincipal -ArgumentList (
+          [System.Security.Principal.WindowsIdentity]::GetCurrent())
+      $Ansible.Result = $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
+      $Ansible.Changed = $false
+  changed_when: false
+  check_mode: false
+  register: _oneagent_is_administrator
+
+- name: Validate that the role runs with administrator privileges
+  ansible.builtin.assert:
+    that: _oneagent_is_administrator.result | bool
+    fail_msg: "{{ oneagent_administrator_privileges_required }}"
+    quiet: true
+
 - name: Validate if download directory is available
   ansible.windows.win_stat:
     path: "{{ oneagent_download_path }}"

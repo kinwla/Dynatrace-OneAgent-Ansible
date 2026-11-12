@@ -1,0 +1,43 @@
+---
+# A Valid status alone only proves that the file is signed by any certificate trusted by the host,
+# so the signer's common name and organization are pinned to the expected publisher as well.
+- name: Validate installer signature
+  ansible.windows.win_powershell:
+    parameters:
+      Path: "{{ oneagent_installer_path }}"
+      Signer: "{{ oneagent_installer_signer_name }}"
+    script: |
+      param([string]$Path, [string]$Signer)
+      $ErrorActionPreference = 'Stop'
+
+      $signature = Get-AuthenticodeSignature -LiteralPath $Path
+      $certificate = $signature.SignerCertificate
+      $subject = ''
+      $commonName = ''
+      if ($certificate) {
+          $subject = $certificate.Subject
+          $commonName = $certificate.GetNameInfo([System.Security.Cryptography.X509Certificates.X509NameType]::SimpleName, $false)
+      }
+      $organization = [regex]::Match($subject, '(?:^|,\s*)O=("[^"]*"|[^,]*)').Groups[1].Value.Trim('"')
+
+      $Ansible.Result = @{
+          valid = ($signature.Status -eq [System.Management.Automation.SignatureStatus]::Valid -and
+                   $commonName -eq $Signer -and $organization -eq $Signer)
+          status = "$($signature.Status)"
+          message = "$($signature.StatusMessage)"
+          subject = $subject
+      }
+      $Ansible.Changed = $false
+  changed_when: false
+  register: _oneagent_signature_verification_result
+  when: not ansible_check_mode
+
+- name: Installer signature validation result
+  ansible.builtin.fail:
+    msg: >-
+      {{ oneagent_signature_verification_failed | format(
+         'status: ' ~ _oneagent_signature_verification_result.result.status ~
+         ', signer: ' ~ (_oneagent_signature_verification_result.result.subject or 'none') ~
+         ', expected signer: ' ~ oneagent_installer_signer_name ~
+         ', ' ~ _oneagent_signature_verification_result.result.message) }}
+  when: not ansible_check_mode and not (_oneagent_signature_verification_result.result.valid | bool)

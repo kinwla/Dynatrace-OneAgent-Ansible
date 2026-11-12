@@ -1,3 +1,4 @@
+import base64
 from pathlib import Path
 
 from command.command_result import CommandResult
@@ -14,11 +15,31 @@ class WindowsCommandWrapper(CommandWrapper):
     def get_file_content(self, address: str, file: Path) -> CommandResult:
         return self.executor.execute(address, "type", str(file))
 
+    def _run_powershell(self, address: str, script: str) -> CommandResult:
+        # Encoding the script avoids quoting issues when passing it through cmd
+        encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
+        return self.executor.execute(
+            address, "powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded
+        )
+
+    @staticmethod
+    def _quote(value: object) -> str:
+        return "'" + str(value).replace("'", "''") + "'"
+
     @override
     def file_exists(self, address: str, file: Path) -> CommandResult:
-        # Windows needs double quoting for passing paths
-        # containing spaces, single quotes don't work
-        return self.executor.execute(address, f'if exist "{file}" (exit 0) else (exit 1)')
+        # Unlike cmd's "if exist", Test-Path resolves wildcards in any path component
+        return self._run_powershell(address, f"if (Test-Path -Path {self._quote(file)}) {{ exit 0 }} else {{ exit 1 }}")
+
+    def write_file(self, address: str, file: Path, content: str) -> CommandResult:
+        return self._run_powershell(
+            address, f"Set-Content -LiteralPath {self._quote(file)} -Value {self._quote(content)} -NoNewline"
+        )
+
+    def remove_items(self, address: str, pattern: Path) -> CommandResult:
+        return self._run_powershell(
+            address, f"Remove-Item -Path {self._quote(pattern)} -Recurse -Force -ErrorAction SilentlyContinue; exit 0"
+        )
 
     @override
     def directory_exists(self, address: str, directory: Path) -> CommandResult:

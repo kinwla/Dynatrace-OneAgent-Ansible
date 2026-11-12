@@ -6,7 +6,7 @@
 - Script access to the OneAgent installer file. You can either:
   - configure the script to download the installer directly from your Dynatrace environment,
   - download it yourself and upload it to the primary node.
-- **Privilege escalation (`become: true`) is required on Linux and AIX.** The role installs OneAgent as root and creates a root-owned temporary directory to store the installer securely. Without privilege escalation the installation will fail. Enable it either at the play level (`become: true` in your playbook) or per host group in your inventory (`ansible_become: true`). On Windows, `become` is not supported and not needed.
+- **Privilege escalation (`become: true`) is required on Linux and AIX.** The role installs OneAgent as root and creates a root-owned temporary directory to store the installer securely. Without privilege escalation the installation will fail. Enable it either at the play level (`become: true` in your playbook) or per host group in your inventory (`ansible_become: true`). On Windows, `become` is not supported and not needed, but the connecting user must be a member of the local Administrators group (or SYSTEM). The role stores the installer in a temporary directory accessible only to SYSTEM and Administrators.
 
 ### Direct download from your environment
 
@@ -47,7 +47,7 @@ The following variables are available in `defaults/main/` and can be overridden:
 | `oneagent_preserve_installer`    | `false`                                                             | Preserve installers on secondary machines after deployment.                                                                                                 |
 | `oneagent_package_state`         | `present`                                                           | OneAgent package state; use `present` or `latest` to make sure it's installed, or `absent` in order to uninstall.                                           |
 | `oneagent_reboot_host`           | `false`                                                             | Reboot the secondary machine after OneAgent installation                                                                                                    |
-| `oneagent_verify_signature`      | `true`                                                              | Verifies installer's signature (available only on AIX/Linux platforms)                                                                                      |
+| `oneagent_verify_signature`      | `true`                                                              | Verifies installer's signature (on Windows, the Authenticode signature issued to `Dynatrace LLC` is verified)                                               |
 | `oneagent_reboot_timeout`        | `3600`                                                              | Set the timeout for rebooting secondary machine in seconds                                                                                                  |
 | `oneagent_no_log`                | `true`                                                              | Sets Ansible `no_log` attribute value in tasks which may log sensitive values                                                                               |
 
